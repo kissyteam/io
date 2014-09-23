@@ -1,0 +1,30 @@
+{
+  "name": "modulex-io",
+  "author": "yiminghe <yiminghe@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/kissyteam/io.git"
+  },
+  "ignore": [
+    "**/*",
+    "!build/**/*",
+    "!lib/**/*",
+    "!meta/**/*",
+    "!index.js"
+  ],
+  "dependencies": {
+    "modulex": "modulex#master",
+    "modulex-util": "*",
+    "modulex-querystring": "*",
+    "modulex-event-custom": "*",
+    "modulex-promise": "*",
+    "modulex-url": "*",
+    "modulex-dom": "*",
+    "modulex-event-dom": "*",
+    "modulex-ua": "*"
+  },
+  "devDependencies": {
+    "jquery": "1.x"
+  }
+}

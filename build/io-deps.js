@@ -1,0 +1,1 @@
+modulex.config("requires",{"io":["util","dom","querystring","event-custom","promise","url","ua","event-dom"]});

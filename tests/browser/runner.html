@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>io tests</title>
+    <link rel='stylesheet' href='/node_modules/mocha/mocha.css'/>
+    <style>
+        html, body {
+            border: 0;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<h1 style="text-align: center">io tests</h1>
+
+<div id='mocha'></div>
+<script src="/bower_components/jquery/dist/jquery.js"></script>
+<script src="/mx_modules/modulex-debug.js"></script>
+<script src="/mx_modules/ua-debug.js"></script>
+<script src="/mx_modules/feature-debug.js"></script>
+<script src="/mx_modules/meta.js"></script>
+
+<script src="/node_modules/async/lib/async.js"></script>
+<script src="/node_modules/node-jscover/lib/front-end/header.js"></script>
+<script src="/node_modules/node-jscover/lib/front-end/jscoverage-branch.js"></script>
+<script src='/node_modules/expect.js/index.js'></script>
+<script src='/node_modules/mocha/mocha.js'></script>
+<script src='/node_modules/node-jscover/lib/reporters/mocha/console.js'></script>
+<script src='/node_modules/node-jscover-coveralls/lib/reports/mocha.js'></script>
+<script>
+    function waits(ms) {
+        return function (next) {
+            setTimeout(next, ms);
+        };
+    }
+    function runs(fn) {
+        return function (next) {
+            if (fn.length) {
+                fn(next);
+            } else {
+                fn();
+                next();
+            }
+        };
+    }
+    mocha.setup('bdd');
+    var isBuild = location.href.indexOf('build') !== -1;
+    var isCoverage = location.search.indexOf('coverage') !== -1;
+    if (location.href.indexOf('__testling') !== -1) {
+        mocha.reporter('tap');
+    }
+</script>
+<script>
+    (function () {
+        ''.trim || (String.prototype.trim = // Use the native method if available, otherwise define a polyfill:
+                function () { // trim returns a new string (which replace supports)
+                    return this.replace(/^[\s\uFEFF]+|[\s\uFEFF]+$/g, '') // trim the left and right sides of the string
+                });
+        if (!document.getElementsByClassName) {
+            document.getElementsByClassName = function (search) {
+                var d = document, elements, pattern, i, results = [];
+                if (d.querySelectorAll) { // IE8
+                    return d.querySelectorAll("." + search);
+                }
+                if (d.evaluate) { // IE6, IE7
+                    pattern = ".//*[contains(concat(' ', @class, ' '), ' " + search + " ')]";
+                    elements = d.evaluate(pattern, d, null, 0, null);
+                    while ((i = elements.iterateNext())) {
+                        results.push(i);
+                    }
+                } else {
+                    elements = d.getElementsByTagName("*");
+                    pattern = new RegExp("(^|\\s)" + search + "(\\s|$)");
+                    for (i = 0; i < elements.length; i++) {
+                        if (pattern.test(elements[i].className)) {
+                            results.push(elements[i]);
+                        }
+                    }
+                }
+                return results;
+            }
+        }
+        window.onerror = function () {
+        };
+        window.SERVER_CONFIG = {
+            ports: [8021, 8022]
+        };
+        modulex.config({
+            base: '/mx_modules',
+            packages: {
+                specs: {
+                    base: '/tests/browser/specs'
+                }
+            }
+        });
+
+        modulex.config({
+            packages: {
+                'io': {
+                    filter: isCoverage ? 'coverage' : isBuild ? 'debug' : '',
+                    base: isBuild ? '/build/io' : '/lib/io'
+                }
+            }
+        });
+
+        modulex.use(['specs/'], function () {
+            var runner;
+            if (window.mochaPhantomJS) {
+                runner = mochaPhantomJS.run();
+                if (isCoverage) {
+                    window.nodeJsCoverCoveralls(runner);
+                }
+            } else {
+                runner = mocha.run();
+                runner.on('fail', function (test, err) {
+                    alert(test.title + ':' + (err.message || err));
+                });
+            }
+            window.onerror = function () {
+            };
+        });
+    })();
+</script>
+</body>
+</html>
