@@ -23,8 +23,5 @@
     "modulex-dom": "*",
     "modulex-event-dom": "*",
     "modulex-ua": "*"
-  },
-  "devDependencies": {
-    "jquery": "1.x"
   }
 }
