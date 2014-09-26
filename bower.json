@@ -15,13 +15,13 @@
   ],
   "dependencies": {
     "modulex": "modulex#master",
-    "modulex-util": "*",
-    "modulex-querystring": "*",
-    "modulex-event-custom": "*",
-    "modulex-promise": "*",
-    "modulex-url": "*",
-    "modulex-dom": "*",
-    "modulex-event-dom": "*",
-    "modulex-ua": "*"
+    "modulex-util": "modulex-util#master",
+    "modulex-querystring": "modulex-querystring#master",
+    "modulex-event-custom": "modulex-event-custom#master",
+    "modulex-promise": "modulex-promise#master",
+    "modulex-url": "modulex-url#master",
+    "modulex-dom": "modulex-dom#master",
+    "modulex-event-dom": "modulex-event-dom#master",
+    "modulex-ua": "modulex-ua#master"
   }
 }
