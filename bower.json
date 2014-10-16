@@ -14,14 +14,14 @@
     "!index.js"
   ],
   "dependencies": {
-    "modulex": "modulex#master",
-    "modulex-util": "modulex-util#master",
-    "modulex-querystring": "modulex-querystring#master",
-    "modulex-event-custom": "modulex-event-custom#master",
-    "modulex-promise": "modulex-promise#master",
-    "modulex-url": "modulex-url#master",
-    "modulex-dom": "modulex-dom#master",
-    "modulex-event-dom": "modulex-event-dom#master",
-    "modulex-ua": "modulex-ua#master"
+    "modulex": "*",
+    "modulex-util": "modulex-util#1.x",
+    "modulex-querystring": "modulex-querystring#1.x",
+    "modulex-event-custom": "modulex-event-custom#1.x",
+    "modulex-promise": "modulex-promise#1.x",
+    "modulex-url": "modulex-url#1.x",
+    "modulex-dom": "modulex-dom#1.x",
+    "modulex-event-dom": "modulex-event-dom#1.x",
+    "modulex-ua": "modulex-ua#1.x"
   }
 }

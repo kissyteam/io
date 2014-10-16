@@ -1,3 +1,8 @@
+/*
+Copyright 2014, modulex-io@1.0.1
+MIT Licensed
+build time: Thu, 16 Oct 2014 06:48:57 GMT
+*/
 modulex.add("io", ["util","dom","querystring","event-custom","promise","url","ua","event-dom"], function(require, exports, module) {
 var _util_ = require("util");
 var dom = require("dom");
@@ -1419,6 +1424,7 @@ _io_ = function (exports) {
     });
   }
   util.mix(IO, {
+    version: '1.0.1',
     _swf: require.toUrl('./io.swf'),
     serialize: serializer.serialize,
     getFormData: serializer.getFormData,
