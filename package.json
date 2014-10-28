@@ -72,13 +72,13 @@
     "browser-test-cover": "mocha-phantomjs -R node_modules/node-jscover/lib/reporters/mocha/console http://localhost:8021/tests/browser/runner.html?coverage"
   },
   "dependencies": {
-    "modulex-util": "*",
-    "modulex-querystring": "*",
-    "modulex-event-custom": "*",
-    "modulex-promise": "*",
-    "modulex-url": "*",
-    "modulex-dom": "*",
-    "modulex-event-dom": "*",
-    "modulex-ua": "*"
+    "modulex-util": "1.x",
+    "modulex-querystring": "1.x",
+    "modulex-event-custom": "1.x",
+    "modulex-promise": "1.x",
+    "modulex-url": "1.x",
+    "modulex-dom": "1.x",
+    "modulex-event-dom": "1.x",
+    "modulex-ua": "1.x"
   }
 }
