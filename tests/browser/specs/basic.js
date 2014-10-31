@@ -325,22 +325,24 @@ describe('basic', function () {
             }, 'json');
         });
 
-        it('cross domain post', function (done) {
-            // get post
-            // chrome/ff send 不报异常 status 0 statusText ''
-            // ie7 send 不报异常 status 0 statusText Security Violation
-            // ie 9 10 send 报异常 error: 未指明错误
-            // ch
-            io({
-                url: 'http://www.alibaba.com/',
-                type: 'post',
-                error: function () {
-                    var args = util.makeArray(arguments);
-                    expect(args[2].status || 500).to.be(500);
-                    done();
-                }
+        if (!window.callPhantom) {
+            it('cross domain post', function (done) {
+                // get post
+                // chrome/ff send 不报异常 status 0 statusText ''
+                // ie7 send 不报异常 status 0 statusText Security Violation
+                // ie 9 10 send 报异常 error: 未指明错误
+                // ch
+                io({
+                    url: 'http://www.alibaba.com/',
+                    type: 'post',
+                    error: function () {
+                        var args = util.makeArray(arguments);
+                        expect(args[2].status || 500).to.be(500);
+                        done();
+                    }
+                });
             });
-        });
+        }
 
         it('cross domain get', function (done) {
             io({
