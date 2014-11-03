@@ -1,26 +1,27 @@
 {
-  "name": "modulex-io",
-  "author": "yiminghe <yiminghe@gmail.com>",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "http://github.com/kissyteam/io.git"
-  },
-  "ignore": [
-    "**/*",
-    "!build/**/*",
-    "!lib/**/*",
-    "!meta/**/*",
-    "!index.js"
-  ],
-  "devDependencies": {
-    "modulex": "*"
-  },
-  "dependencies": {
-    "modulex-util": "1.x",
-    "modulex-querystring": "1.x",
-    "modulex-promise": "1.x",
-    "modulex-url": "1.x",
-    "modulex-dom": "1.x"
-  }
+    "name": "modulex-io",
+    "author": "yiminghe <yiminghe@gmail.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "http://github.com/kissyteam/io.git"
+    },
+    "ignore": [
+        "**/*",
+        "!build/**/*",
+        "!lib/**/*",
+        "!meta/**/*",
+        "!index.js"
+    ],
+    "devDependencies": {
+        "modulex": "*",
+        "modulex-ua": "*"
+    },
+    "dependencies": {
+        "modulex-util": "1.x",
+        "modulex-querystring": "1.x",
+        "modulex-promise": "1.x",
+        "modulex-url": "1.x",
+        "modulex-dom": "1.x"
+    }
 }

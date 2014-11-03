@@ -3,6 +3,7 @@
  */
 
 var io = require('io');
+var UA = require('ua');
 var util = require('util');
 /*jshint quotmark:false*/
 describe('basic', function () {
@@ -344,20 +345,22 @@ describe('basic', function () {
             });
         }
 
-        it('cross domain get', function (done) {
-            io({
-                url: 'http://www.alibaba.com/',
-                type: 'get',
-                error: function () {
-                    var args = util.makeArray(arguments);
-                    // chrome status 0
-                    // security error
-                    // ie10 throw error when send status 未指明的错误
-                    expect(args[2].status || 500).to.be(500);
-                    done();
-                }
+        if (!UA.phantomjs) {
+            it('cross domain get', function (done) {
+                io({
+                    url: 'http://www.alibaba.com/',
+                    type: 'get',
+                    error: function () {
+                        var args = util.makeArray(arguments);
+                        // chrome status 0
+                        // security error
+                        // ie10 throw error when send status 未指明的错误
+                        expect(args[2].status || 500).to.be(500);
+                        done();
+                    }
+                });
             });
-        });
+        }
 
         it('post context', function (done) {
             io.post('/tests/browser/data/interface.jss', function () {
