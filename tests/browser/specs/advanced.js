@@ -6,10 +6,7 @@ var io = require('io');
 var util = require('util');
 var UA = require('ua');
 var url = require('url');
-
-
 /*jshint quotmark:false*/
-
 describe("Advanced IO", function () {
     it('support custom contentType', function (done) {
         io({
@@ -94,7 +91,7 @@ describe("Advanced IO", function () {
             cache: false,
             ifModified: true,
             form: form[0],
-            serializeArray:false,
+            serializeArray: false,
             success: function (data, status, xhr) {
                 expect(data).to.be("haha");
                 expect(status).to.be("success");
@@ -104,7 +101,7 @@ describe("Advanced IO", function () {
                     dataType: "text",
                     cache: false,
                     form: form[0],
-                    serializeArray:false,
+                    serializeArray: false,
                     ifModified: true,
                     success: function (data, status, xhr) {
                         if (status === 'not modified') {
@@ -259,40 +256,41 @@ describe("Advanced IO", function () {
         });
     });
 
+    if (!UA.ie || UA.ie > 7) {
+        it("should works for form file upload", function (done) {
+            var f = $('<form>' +
+                '<input name="test4" value="t6"/>' +
+                //'<input name="test4" value="t7"/>' +
+                '<input name="test5" value="t8"/>' +
+                '<input name="testFile" type="file"/>' +
+                '<select name="test">' +
+                '<option value="t1" selected>v</option>' +
+                '<option value="t2">v2</option>' +
+                '</select>' +
+                '</form>').appendTo('body');
 
-    it("should works for form file upload", function (done) {
-        var f = $('<form>' +
-            '<input name="test4" value="t6"/>' +
-            //'<input name="test4" value="t7"/>' +
-            '<input name="test5" value="t8"/>' +
-            '<input name="testFile" type="file"/>' +
-            '<select name="test">' +
-            '<option value="t1" selected>v</option>' +
-            '<option value="t2">v2</option>' +
-            '</select>' +
-            '</form>').appendTo('body');
-
-        io({
-            url: '/tests/browser/others/form/upload.jss',
-            form: f[0],
-            type: 'post',
-            dataType: 'json',
-            data: {
-                "test2": ["t2"],
-                "test3": "t4"
-            },
-            serializeArray:false,
-            complete: function (data) {
-                expect(data.test + "").to.be(["t1"] + "");
-                expect(data.test4 + "").to.be(["t6"] + "");
-                expect(data.test2 + "").to.be(["t2"] + "");
-                expect(data.test3 + "").to.be("t4");
-                expect(data.test5 + "").to.be("t8");
-                f.remove();
-                done();
-            }
+            io({
+                url: '/tests/browser/others/form/upload.jss',
+                form: f[0],
+                type: 'post',
+                dataType: 'json',
+                data: {
+                    "test2": ["t2"],
+                    "test3": "t4"
+                },
+                serializeArray: false,
+                complete: function (data) {
+                    expect(data.test + "").to.be(["t1"] + "");
+                    expect(data.test4 + "").to.be(["t6"] + "");
+                    expect(data.test2 + "").to.be(["t2"] + "");
+                    expect(data.test3 + "").to.be("t4");
+                    expect(data.test5 + "").to.be("t8");
+                    f.remove();
+                    done();
+                }
+            });
         });
-    });
+    }
 
     it("should works for common form", function (done) {
         var f = $('<form>' +
@@ -311,7 +309,7 @@ describe("Advanced IO", function () {
             form: f[0],
             type: 'post',
             dataType: 'json',
-            serializeArray:false,
+            serializeArray: false,
             data: {
                 "test2": ["t2", "t3"],
                 "test3": "t4"

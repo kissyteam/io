@@ -115,7 +115,7 @@
             } else {
                 runner = mocha.run();
                 runner.on('fail', function (test, err) {
-                    alert(test.title + ':' + (err.message || err));
+                    // alert(test.title + ':' + (err.message || err));
                 });
             }
             window.onerror = function () {
