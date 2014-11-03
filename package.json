@@ -1,6 +1,6 @@
 {
   "name": "modulex-io",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "yiminghe <yiminghe@gmail.com>",
   "engines": {
     "node": "~0.11"
@@ -74,11 +74,8 @@
   "dependencies": {
     "modulex-util": "1.x",
     "modulex-querystring": "1.x",
-    "modulex-event-custom": "1.x",
     "modulex-promise": "1.x",
     "modulex-url": "1.x",
-    "modulex-dom": "1.x",
-    "modulex-event-dom": "1.x",
-    "modulex-ua": "1.x"
+    "modulex-dom": "1.x"
   }
 }
