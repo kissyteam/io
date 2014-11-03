@@ -1,6 +1,6 @@
 /*
-Copyright 2014, modulex-io@1.0.1
+Copyright 2014, modulex-io@1.1.0
 MIT Licensed
-build time: Thu, 16 Oct 2014 06:48:57 GMT
+build time: Mon, 03 Nov 2014 09:30:29 GMT
 */
-{"io":["util","dom","querystring","event-custom","promise","url","ua","event-dom"]}
+{"io":["util","dom","querystring","promise","url"]}

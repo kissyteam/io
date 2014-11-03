@@ -478,7 +478,7 @@ describe('basic', function () {
                 io.on(type, function (ev) {
                     io.detach(type, arguments.callee);
                     called.push(ev.type);
-                    expect(ev.ajaxConfig).not.to.be(undefined);
+                    expect(ev.io.config).not.to.be(undefined);
                     expect(ev.type).to.be(type);
                 });
             });
@@ -494,7 +494,7 @@ describe('basic', function () {
             io.on('error', function x(ev) {
                 // ie<9 bug x!==arguments.callee
                 io.detach('error', arguments.callee);
-                expect(ev.ajaxConfig).not.to.be(undefined);
+                expect(ev.io.config).not.to.be(undefined);
                 expect(ev.type).to.be('error');
                 done();
             });

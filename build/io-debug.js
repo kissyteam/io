@@ -1,17 +1,14 @@
 /*
-Copyright 2014, modulex-io@1.0.1
+Copyright 2014, modulex-io@1.1.0
 MIT Licensed
-build time: Thu, 16 Oct 2014 06:48:57 GMT
+build time: Mon, 03 Nov 2014 09:30:29 GMT
 */
-modulex.add("io", ["util","dom","querystring","event-custom","promise","url","ua","event-dom"], function(require, exports, module) {
+modulex.add("io", ["util","dom","querystring","promise","url"], function(require, exports, module) {
 var _util_ = require("util");
 var dom = require("dom");
 var _querystring_ = require("querystring");
-var eventCustom = require("event-custom");
 var promise = require("promise");
 var _url_ = require("url");
-var ua = require("ua");
-var eventDom = require("event-dom");
 /*
 combined modules:
 io
@@ -19,6 +16,7 @@ io/form-serializer
 io/base
 io/xhr-transport
 io/xhr-transport-base
+io/utils
 io/xdr-flash-transport
 io/sub-domain-transport
 io/script-transport
@@ -27,7 +25,7 @@ io/form
 io/iframe-transport
 io/methods
 */
-var ioFormSerializer, ioBase, ioXhrTransportBase, ioXdrFlashTransport, ioSubDomainTransport, ioScriptTransport, ioJsonp, ioForm, ioIframeTransport, ioMethods, ioXhrTransport, _io_;
+var ioFormSerializer, ioBase, ioXdrFlashTransport, ioScriptTransport, ioJsonp, ioForm, ioIframeTransport, ioMethods, ioXhrTransportBase, ioSubDomainTransport, ioXhrTransport, _io_, _ioUtils_;
 ioFormSerializer = function (exports) {
   /**
    * @ignore
@@ -118,8 +116,6 @@ ioBase = function (exports) {
    */
   var util = _util_;
   var querystring = _querystring_;
-  /*global CustomEvent:true*/
-  var CustomEvent = eventCustom;
   var XPromise = promise;
   var url = _url_;
   var rlocalProtocol = /^(?:about|app|app\-storage|.+\-extension|file|widget):$/, rspace = /\s+/, mirror = function (s) {
@@ -240,7 +236,7 @@ ioBase = function (exports) {
    *
    * @cfg {Object} data
    * Data sent to server.if processData is true,data will be serialized to String type.
-   * if value if an Array, serialization will be based on serializeArray.
+   * if value is an Array, serialization will be based on serializeArray.
    *
    * @cfg {String} dataType
    * return data as a specified type
@@ -427,14 +423,10 @@ ioBase = function (exports) {
      * @event start
      * @member IO
      * @static
-     * @param {Event.CustomEvent.Object} e
      * @param {IO} e.io current io
      */
-    IO.fire('start', {
-      // 兼容
-      ajaxConfig: c,
-      io: self
-    });
+    IO.callPreprocessors('start', { io: self });
+    IO.fire('start', { io: self });
     TransportConstructor = transports[c.dataType[0]] || transports['*'];
     transport = new TransportConstructor(self);
     self.transport = transport;
@@ -459,14 +451,10 @@ ioBase = function (exports) {
      * @event send
      * @member IO
      * @static
-     * @param {Event.CustomEvent.Object} e
      * @param {IO} e.io current io
      */
-    IO.fire('send', {
-      // 兼容
-      ajaxConfig: c,
-      io: self
-    });
+    IO.callPreprocessors('send', { io: self });
+    IO.fire('send', { io: self });
     // Timeout
     if (c.async && timeout > 0) {
       self.timeoutTimer = setTimeout(function () {
@@ -491,11 +479,52 @@ ioBase = function (exports) {
     }
     return self;
   }
-  util.mix(IO, CustomEvent.Target);
+  var preprocessors = {};
+  var events = {};
   util.mix(IO, {
+    preprocessors: preprocessors,
+    events: events,
+    addPreprocessor: function (type, callback) {
+      var callbacks = preprocessors[type] = preprocessors[type] || [];
+      callbacks.push(callback);
+      return IO;
+    },
+    callPreprocessors: function (type, info) {
+      var callbacks = (preprocessors[type] || []).concat();
+      for (var i = 0, l = callbacks.length; i < l; i++) {
+        callbacks[i].call(IO, info);
+      }
+    },
+    on: function (type, callback) {
+      var callbacks = events[type] = events[type] || [];
+      callbacks.push(callback);
+      return IO;
+    },
+    detach: function (type, callback) {
+      if (callback) {
+        var list = events[type];
+        if (list) {
+          var index = util.indexOf(callback, list);
+          if (index !== -1) {
+            list.splice(index, 1);
+          }
+        }
+      } else {
+        events[type] = [];
+      }
+    },
+    fire: function (type, info) {
+      var callbacks = (events[type] || []).concat();
+      info = info || {};
+      info.type = type;
+      info.target = info.currentTarget = IO;
+      for (var i = 0, l = callbacks.length; i < l; i++) {
+        callbacks[i].call(IO, info);
+      }
+    },
     /**
      * whether current application is a local application
-     * (protocal is file://,widget://,about://)
+     * (protocol is file://,widget://,about://)
      * @type {Boolean}
      * @member IO
      * @static
@@ -539,13 +568,624 @@ ioBase = function (exports) {
   exports = IO;
   return exports;
 }();
+_ioUtils_ = function (exports) {
+  function addEvent(el, type, callback) {
+    if (el.addEventListener) {
+      el.addEventListener(type, callback, false);
+    } else if (el.attachEvent) {
+      el.attachEvent('on' + type, callback);
+    }
+  }
+  function removeEvent(el, type, callback) {
+    if (el.removeEventListener) {
+      el.removeEventListener(type, callback, false);
+    } else if (el.detachEvent) {
+      el.detachEvent('on' + type, callback);
+    }
+  }
+  var utils = {
+    addEvent: addEvent,
+    removeEvent: removeEvent
+  };
+  function numberify(s) {
+    var c = 0;
+    return parseFloat(s.replace(/\./g, function () {
+      return c++ === 0 ? '.' : '';
+    }));
+  }
+  var m, v;
+  var ua = (window.navigator || {}).userAgent || '';
+  if ((m = ua.match(/MSIE ([^;]*)|Trident.*; rv(?:\s|:)?([0-9.]+)/)) && (v = m[1] || m[2])) {
+    utils.ie = numberify(v);
+    utils.ieMode = document.documentMode || utils.ie;
+  }
+  exports = utils;
+  return exports;
+}();
+ioXdrFlashTransport = function (exports) {
+  var util = _util_;
+  var IO = ioBase, Dom = dom;
+  var maps = {}, ID = 'io_swf', flash, doc = document, init = false;
+  var ioName = util.guid('IO' + +new Date());
+  window[ioName] = IO;
+  function _swf(uri, _, uid) {
+    if (init) {
+      return;
+    }
+    init = true;
+    var o = '<object id="' + ID + '" type="application/x-shockwave-flash" data="' + uri + '" width="0" height="0">' + '<param name="movie" value="' + uri + '" />' + '<param name="FlashVars" value="yid=' + _ + '&uid=' + uid + '&host=' + ioName + '" />' + '<param name="allowScriptAccess" value="always" />' + '</object>', c = doc.createElement('div');
+    Dom.prepend(c, doc.body || doc.documentElement);
+    c.innerHTML = o;
+  }
+  function XdrFlashTransport(io) {
+    this.io = io;
+  }
+  util.augment(XdrFlashTransport, {
+    send: function () {
+      var self = this, io = self.io, c = io.config, xdr = c.xdr || {};
+      if (!xdr.src) {
+        xdr.src = IO._swf;
+      }
+      _swf(xdr.src, 1, 1);
+      if (!flash) {
+        setTimeout(function () {
+          self.send();
+        }, 200);
+        return;
+      }
+      self._uid = util.guid();
+      maps[self._uid] = self;
+      flash.send(io._getUrlForSend(), {
+        id: self._uid,
+        uid: self._uid,
+        method: c.type,
+        data: c.hasContent && c.data || {}
+      });
+    },
+    abort: function () {
+      flash.abort(this._uid);
+    },
+    _xdrResponse: function (e, o) {
+      var self = this, ret, id = o.id, responseText, c = o.c, io = self.io;
+      if (c && (responseText = c.responseText)) {
+        io.responseText = decodeURI(responseText);
+      }
+      switch (e) {
+      case 'success':
+        ret = {
+          status: 200,
+          statusText: 'success'
+        };
+        delete maps[id];
+        break;
+      case 'abort':
+        delete maps[id];
+        break;
+      case 'timeout':
+      case 'transport error':
+      case 'failure':
+        delete maps[id];
+        ret = {
+          status: 'status' in c ? c.status : 500,
+          statusText: c.statusText || e
+        };
+        break;
+      }
+      if (ret) {
+        io._ioReady(ret.status, ret.statusText);
+      }
+    }
+  });
+  IO.applyTo = function (_, cmd, args) {
+    var cmds = cmd.split('.').slice(1), func = IO;
+    util.each(cmds, function (c) {
+      func = func[c];
+    });
+    func.apply(null, args);
+  };
+  IO.xdrReady = function () {
+    flash = doc.getElementById(ID);
+  };
+  IO.xdrResponse = function (e, o) {
+    var xhr = maps[o.uid];
+    if (xhr) {
+      xhr._xdrResponse(e, o);
+    }
+  };
+  exports = XdrFlashTransport;
+  return exports;
+}();
+ioScriptTransport = function (exports) {
+  var util = _util_;
+  var IO = ioBase;
+  var OK_CODE = 200, ERROR_CODE = 500;
+  IO.setupConfig({
+    accepts: { script: 'text/javascript, ' + 'application/javascript, ' + 'application/ecmascript, ' + 'application/x-ecmascript' },
+    contents: { script: /javascript|ecmascript/ },
+    converters: {
+      text: {
+        script: function (text) {
+          util.globalEval(text);
+          return text;
+        }
+      }
+    }
+  });
+  function ScriptTransport(io) {
+    var config = io.config, self = this;
+    if (!config.crossDomain) {
+      return new (IO.getTransport('*'))(io);
+    }
+    self.io = io;
+    return self;
+  }
+  util.augment(ScriptTransport, {
+    send: function () {
+      var self = this, io = self.io, c = io.config;
+      self.script = require.load(io._getUrlForSend(), {
+        charset: c.scriptCharset,
+        success: function () {
+          self._callback('success');
+        },
+        error: function () {
+          self._callback('error');
+        }
+      });
+    },
+    _callback: function (event, abort) {
+      var self = this, script = self.script, io = self.io;
+      if (!script) {
+        return;
+      }
+      self.script = undefined;
+      if (abort) {
+        return;
+      }
+      if (event !== 'error') {
+        io._ioReady(OK_CODE, 'success');
+      } else if (event === 'error') {
+        io._ioReady(ERROR_CODE, 'script error');
+      }
+    },
+    abort: function () {
+      this._callback(0, 1);
+    }
+  });
+  IO.setupTransport('script', ScriptTransport);
+  return exports;
+}();
+ioJsonp = function (exports) {
+  var util = _util_;
+  var IO = ioBase;
+  var win = window;
+  IO.setupConfig({
+    jsonp: 'callback',
+    jsonpCallback: function () {
+      return util.guid('jsonp');
+    }
+  });
+  IO.addPreprocessor('start', function (e) {
+    var io = e.io, c = io.config, dataType = c.dataType;
+    if (dataType[0] === 'jsonp') {
+      delete c.contentType;
+      var response, cJsonpCallback = c.jsonpCallback, converters, jsonpCallback = typeof cJsonpCallback === 'function' ? cJsonpCallback() : cJsonpCallback, previous = win[jsonpCallback];
+      c.uri.query[c.jsonp] = jsonpCallback;
+      win[jsonpCallback] = function (r) {
+        if (arguments.length > 1) {
+          r = util.makeArray(arguments);
+        }
+        response = [r];
+      };
+      io.fin(function () {
+        win[jsonpCallback] = previous;
+        if (previous === undefined) {
+          try {
+            delete win[jsonpCallback];
+          } catch (e) {
+          }
+        } else if (response) {
+          previous(response[0]);
+        }
+      });
+      converters = c.converters;
+      converters.script = converters.script || {};
+      converters.script.json = function () {
+        if (!response) {
+          throw new Error('not call jsonpCallback: ' + jsonpCallback);
+        }
+        return response[0];
+      };
+      dataType.length = 2;
+      dataType[0] = 'script';
+      dataType[1] = 'json';
+    }
+  });
+  return exports;
+}();
+ioForm = function (exports) {
+  var util = _util_;
+  var IO = ioBase;
+  var Dom = dom;
+  var querystring = _querystring_;
+  var FormSerializer = ioFormSerializer;
+  var win = window, slice = Array.prototype.slice, FormData = win.FormData;
+  IO.addPreprocessor('start', function (e) {
+    var io = e.io, form, d, dataType, formParam, data, c = io.config, tmpForm = c.form;
+    if (tmpForm) {
+      form = Dom.get(tmpForm);
+      data = c.data;
+      var isUpload = false;
+      var files = {};
+      var inputs = Dom.query('input', form);
+      for (var i = 0, l = inputs.length; i < l; i++) {
+        var input = inputs[i];
+        if (input.type.toLowerCase() === 'file') {
+          isUpload = true;
+          if (!FormData) {
+            break;
+          }
+          var selected = slice.call(input.files, 0);
+          files[Dom.attr(input, 'name')] = selected.length > 1 ? selected : selected[0] || null;
+        }
+      }
+      if (isUpload && FormData) {
+        c.files = c.files || {};
+        util.mix(c.files, files);
+        delete c.contentType;
+      }
+      if (!isUpload || FormData) {
+        formParam = FormSerializer.getFormData(form);
+        if (c.hasContent) {
+          formParam = querystring.stringify(formParam, undefined, undefined, c.serializeArray);
+          if (data) {
+            c.data += '&' + formParam;
+          } else {
+            c.data = formParam;
+          }
+        } else {
+          util.mix(c.uri.query, formParam);
+        }
+      } else {
+        dataType = c.dataType;
+        d = dataType[0];
+        if (d === '*') {
+          d = 'text';
+        }
+        dataType.length = 2;
+        dataType[0] = 'iframe';
+        dataType[1] = d;
+      }
+    }
+  });
+  return exports;
+}();
+ioIframeTransport = function (exports) {
+  var util = _util_;
+  var ioUtils = _ioUtils_;
+  var querystring = _querystring_;
+  var Dom = dom;
+  var IO = ioBase;
+  var doc = document, OK_CODE = 200, ERROR_CODE = 500, BREATH_INTERVAL = 30, iframeConverter = util.clone(IO.getConfig().converters.text);
+  iframeConverter.json = function (str) {
+    return util.parseJson(util.unEscapeHtml(str));
+  };
+  IO.setupConfig({
+    converters: {
+      iframe: iframeConverter,
+      text: {
+        iframe: function (text) {
+          return text;
+        }
+      },
+      xml: {
+        iframe: function (xml) {
+          return xml;
+        }
+      }
+    }
+  });
+  function createIframe(xhr) {
+    var id = util.guid('io-iframe'), iframe, src = Dom.getEmptyIframeSrc();
+    iframe = xhr.iframe = Dom.create('<iframe ' + (src ? ' src="' + src + '" ' : '') + ' id="' + id + '"' + ' name="' + id + '"' + ' style="position:absolute;left:-9999px;top:-9999px;"/>');
+    Dom.prepend(iframe, doc.body || doc.documentElement);
+    return iframe;
+  }
+  function addDataToForm(query, form, serializeArray) {
+    var ret = [], isArray, i, e;
+    util.each(query, function (data, k) {
+      isArray = util.isArray(data);
+      if (!isArray) {
+        data = [data];
+      }
+      for (i = 0; i < data.length; i++) {
+        e = doc.createElement('input');
+        e.type = 'hidden';
+        e.name = k + (isArray && serializeArray ? '[]' : '');
+        e.value = data[i];
+        Dom.append(e, form);
+        ret.push(e);
+      }
+    });
+    return ret;
+  }
+  function removeFieldsFromData(fields) {
+    Dom.remove(fields);
+  }
+  function callback(event) {
+    var self = this, form = self.form, io = self.io, eventType = event.type, iframeDoc, iframe = io.iframe;
+    if (!iframe) {
+      return;
+    }
+    if (eventType === 'abort' && ioUtils.ie === 6) {
+      setTimeout(function () {
+        Dom.attr(form, self.attrs);
+      }, 0);
+    } else {
+      Dom.attr(form, self.attrs);
+    }
+    removeFieldsFromData(this.fields);
+    ioUtils.removeEvent(iframe, 'load', self._callback);
+    ioUtils.removeEvent(iframe, 'error', self._callback);
+    setTimeout(function () {
+      Dom.remove(iframe);
+    }, BREATH_INTERVAL);
+    io.iframe = null;
+    if (eventType === 'load') {
+      try {
+        iframeDoc = iframe.contentWindow.document;
+        if (iframeDoc && iframeDoc.body) {
+          io.responseText = Dom.html(iframeDoc.body);
+          if (util.startsWith(io.responseText, '<?xml')) {
+            io.responseText = undefined;
+          }
+        }
+        if (iframeDoc && iframeDoc.XMLDocument) {
+          io.responseXML = iframeDoc.XMLDocument;
+        } else {
+          io.responseXML = iframeDoc;
+        }
+        if (iframeDoc) {
+          io._ioReady(OK_CODE, 'success');
+        } else {
+          io._ioReady(ERROR_CODE, 'parser error');
+        }
+      } catch (e) {
+        io._ioReady(ERROR_CODE, 'parser error');
+      }
+    } else if (eventType === 'error') {
+      io._ioReady(ERROR_CODE, 'error');
+    }
+  }
+  function IframeTransport(io) {
+    this.io = io;
+    this._callback = util.bind(callback, this);
+  }
+  util.augment(IframeTransport, {
+    send: function () {
+      var self = this, io = self.io, c = io.config, fields, iframe, query, data = c.data, form = Dom.get(c.form);
+      self.attrs = {
+        target: Dom.attr(form, 'target') || '',
+        action: Dom.attr(form, 'action') || '',
+        encoding: Dom.attr(form, 'encoding'),
+        enctype: Dom.attr(form, 'enctype'),
+        method: Dom.attr(form, 'method')
+      };
+      self.form = form;
+      iframe = createIframe(io);
+      Dom.attr(form, {
+        target: iframe.id,
+        action: io._getUrlForSend(),
+        method: 'post',
+        enctype: 'multipart/form-data',
+        encoding: 'multipart/form-data'
+      });
+      if (data) {
+        query = querystring.parse(data);
+      }
+      if (query) {
+        fields = addDataToForm(query, form, c.serializeArray);
+      }
+      self.fields = fields;
+      function go() {
+        ioUtils.addEvent(iframe, 'load', self._callback);
+        ioUtils.addEvent(iframe, 'error', self._callback);
+        form.submit();
+      }
+      if (ioUtils.ie === 6) {
+        setTimeout(go, 0);
+      } else {
+        go();
+      }
+    },
+    abort: function () {
+      this._callback({ type: 'abort' });
+    }
+  });
+  IO.setupTransport('iframe', IframeTransport);
+  return exports;
+}();
+ioMethods = function (exports) {
+  var util = _util_;
+  var XPromise = promise, IO = ioBase;
+  var url = _url_;
+  var OK_CODE = 200, MULTIPLE_CHOICES = 300, NOT_MODIFIED = 304, HEADER_REG = /^(.*?):[ \t]*([^\r\n]*)\r?$/gm;
+  function handleResponseData(io) {
+    var text = io.responseText, xml = io.responseXML, c = io.config, converts = c.converters, type, contentType, responseData, contents = c.contents, dataType = c.dataType;
+    if (text || xml) {
+      contentType = io.mimeType || io.getResponseHeader('Content-Type');
+      while (dataType[0] === '*') {
+        dataType.shift();
+      }
+      if (!dataType.length) {
+        for (type in contents) {
+          if (contents[type].test(contentType)) {
+            if (dataType[0] !== type) {
+              dataType.unshift(type);
+            }
+            break;
+          }
+        }
+      }
+      dataType[0] = dataType[0] || 'text';
+      for (var dataTypeIndex = 0; dataTypeIndex < dataType.length; dataTypeIndex++) {
+        if (dataType[dataTypeIndex] === 'text' && text !== undefined) {
+          responseData = text;
+          break;
+        } else if (dataType[dataTypeIndex] === 'xml' && xml !== undefined) {
+          responseData = xml;
+          break;
+        }
+      }
+      if (!responseData) {
+        var rawData = {
+          text: text,
+          xml: xml
+        };
+        util.each([
+          'text',
+          'xml'
+        ], function (prevType) {
+          var type = dataType[0], converter = converts[prevType] && converts[prevType][type];
+          if (converter && rawData[prevType]) {
+            dataType.unshift(prevType);
+            responseData = prevType === 'text' ? text : xml;
+            return false;
+          }
+          return undefined;
+        });
+      }
+    }
+    var prevType = dataType[0];
+    for (var i = 1; i < dataType.length; i++) {
+      type = dataType[i];
+      var converter = converts[prevType] && converts[prevType][type];
+      if (!converter) {
+        throw new Error('no covert for ' + prevType + ' => ' + type);
+      }
+      responseData = converter(responseData);
+      prevType = type;
+    }
+    io.responseData = responseData;
+  }
+  util.extend(IO, XPromise, {
+    setRequestHeader: function (name, value) {
+      var self = this;
+      self.requestHeaders[name] = value;
+      return self;
+    },
+    getAllResponseHeaders: function () {
+      var self = this;
+      return self.state === 2 ? self.responseHeadersString : null;
+    },
+    getResponseHeader: function (name) {
+      var match, responseHeaders, self = this;
+      name = name.toLowerCase();
+      if (self.state === 2) {
+        if (!(responseHeaders = self.responseHeaders)) {
+          responseHeaders = self.responseHeaders = {};
+          while (match = HEADER_REG.exec(self.responseHeadersString)) {
+            responseHeaders[match[1].toLowerCase()] = match[2];
+          }
+        }
+        match = responseHeaders[name];
+      }
+      return match === undefined ? null : match;
+    },
+    overrideMimeType: function (type) {
+      var self = this;
+      if (!self.state) {
+        self.mimeType = type;
+      }
+      return self;
+    },
+    abort: function (statusText) {
+      var self = this;
+      statusText = statusText || 'abort';
+      if (self.transport) {
+        self.transport.abort(statusText);
+      }
+      self._ioReady(0, statusText);
+      return self;
+    },
+    getNativeXhr: function () {
+      var transport = this.transport;
+      if (transport) {
+        return transport.nativeXhr;
+      }
+      return null;
+    },
+    _ioReady: function (status, statusText) {
+      var self = this;
+      if (self.state === 2) {
+        return;
+      }
+      self.state = 2;
+      self.readyState = 4;
+      var isSuccess;
+      if (status >= OK_CODE && status < MULTIPLE_CHOICES || status === NOT_MODIFIED) {
+        if (status === NOT_MODIFIED) {
+          statusText = 'not modified';
+          isSuccess = true;
+        } else {
+          try {
+            handleResponseData(self);
+            statusText = 'success';
+            isSuccess = true;
+          } catch (e) {
+            if ('@DEBUG@') {
+              console.error(e.stack || e);
+              setTimeout(function () {
+                throw e;
+              }, 0);
+            }
+            statusText = e.message || 'parser error';
+          }
+        }
+      } else {
+        if (status < 0) {
+          status = 0;
+        }
+      }
+      self.status = status;
+      self.statusText = statusText;
+      var defer = self.defer, config = self.config, timeoutTimer;
+      if (timeoutTimer = self.timeoutTimer) {
+        clearTimeout(timeoutTimer);
+        self.timeoutTimer = 0;
+      }
+      var handler = isSuccess ? 'success' : 'error', h, v = [
+          self.responseData,
+          statusText,
+          self
+        ], context = config.context, eventObject = { io: self };
+      if (h = config[handler]) {
+        h.apply(context, v);
+      }
+      if (h = config.complete) {
+        h.apply(context, v);
+      }
+      IO.fire(handler, eventObject);
+      IO.fire('complete', eventObject);
+      defer[isSuccess ? 'resolve' : 'reject'](v);
+    },
+    _getUrlForSend: function () {
+      var c = this.config, uri = c.uri;
+      var search = uri.search || '';
+      delete uri.search;
+      if (search && !util.isEmptyObject(uri.query)) {
+        search = '&' + search.substring(1);
+      }
+      return url.stringify(uri, c.serializeArray) + search;
+    }
+  });
+  return exports;
+}();
 ioXhrTransportBase = function (exports) {
   var util = _util_;
   var url = _url_;
   var querystring = _querystring_;
   var IO = ioBase;
-  var UA = ua;
-  var OK_CODE = 200, supportCORS, win = window, XDomainRequest_ = UA.ieMode > 7 && win.XDomainRequest, NO_CONTENT_CODE = 204, NOT_FOUND_CODE = 404, NO_CONTENT_CODE2 = 1223, XhrTransportBase = { proto: {} }, lastModifiedCached = {}, eTagCached = {};
+  var OK_CODE = 200, supportCORS, win = window, XDomainRequest_ = _ioUtils_.ieMode > 7 && win.XDomainRequest, NO_CONTENT_CODE = 204, NOT_FOUND_CODE = 404, NO_CONTENT_CODE2 = 1223, XhrTransportBase = { proto: {} }, lastModifiedCached = {}, eTagCached = {};
   IO.__lastModifiedCached = lastModifiedCached;
   IO.__eTagCached = eTagCached;
   XhrTransportBase.nativeXhr = win.ActiveXObject ? function (crossDomain, refWin) {
@@ -744,107 +1384,20 @@ ioXhrTransportBase = function (exports) {
   exports = XhrTransportBase;
   return exports;
 }();
-ioXdrFlashTransport = function (exports) {
-  var util = _util_;
-  var IO = ioBase, Dom = dom;
-  var maps = {}, ID = 'io_swf', flash, doc = document, init = false;
-  var ioName = util.guid('IO' + +new Date());
-  window[ioName] = IO;
-  function _swf(uri, _, uid) {
-    if (init) {
-      return;
-    }
-    init = true;
-    var o = '<object id="' + ID + '" type="application/x-shockwave-flash" data="' + uri + '" width="0" height="0">' + '<param name="movie" value="' + uri + '" />' + '<param name="FlashVars" value="yid=' + _ + '&uid=' + uid + '&host=' + ioName + '" />' + '<param name="allowScriptAccess" value="always" />' + '</object>', c = doc.createElement('div');
-    Dom.prepend(c, doc.body || doc.documentElement);
-    c.innerHTML = o;
-  }
-  function XdrFlashTransport(io) {
-    this.io = io;
-  }
-  util.augment(XdrFlashTransport, {
-    send: function () {
-      var self = this, io = self.io, c = io.config, xdr = c.xdr || {};
-      if (!xdr.src) {
-        xdr.src = IO._swf;
-      }
-      _swf(xdr.src, 1, 1);
-      if (!flash) {
-        setTimeout(function () {
-          self.send();
-        }, 200);
-        return;
-      }
-      self._uid = util.guid();
-      maps[self._uid] = self;
-      flash.send(io._getUrlForSend(), {
-        id: self._uid,
-        uid: self._uid,
-        method: c.type,
-        data: c.hasContent && c.data || {}
-      });
-    },
-    abort: function () {
-      flash.abort(this._uid);
-    },
-    _xdrResponse: function (e, o) {
-      var self = this, ret, id = o.id, responseText, c = o.c, io = self.io;
-      if (c && (responseText = c.responseText)) {
-        io.responseText = decodeURI(responseText);
-      }
-      switch (e) {
-      case 'success':
-        ret = {
-          status: 200,
-          statusText: 'success'
-        };
-        delete maps[id];
-        break;
-      case 'abort':
-        delete maps[id];
-        break;
-      case 'timeout':
-      case 'transport error':
-      case 'failure':
-        delete maps[id];
-        ret = {
-          status: 'status' in c ? c.status : 500,
-          statusText: c.statusText || e
-        };
-        break;
-      }
-      if (ret) {
-        io._ioReady(ret.status, ret.statusText);
-      }
-    }
-  });
-  IO.applyTo = function (_, cmd, args) {
-    var cmds = cmd.split('.').slice(1), func = IO;
-    util.each(cmds, function (c) {
-      func = func[c];
-    });
-    func.apply(null, args);
-  };
-  IO.xdrReady = function () {
-    flash = doc.getElementById(ID);
-  };
-  IO.xdrResponse = function (e, o) {
-    var xhr = maps[o.uid];
-    if (xhr) {
-      xhr._xdrResponse(e, o);
-    }
-  };
-  exports = XdrFlashTransport;
-  return exports;
-}();
 ioSubDomainTransport = function (exports) {
   var util = _util_;
-  var DomEvent = eventDom, url = _url_, Dom = dom, XhrTransportBase = ioXhrTransportBase;
-  var PROXY_PAGE = '/sub_domain_proxy.html', doc = document, iframeMap = {};
+  var ioUtil = _ioUtils_;
+  var url = _url_;
+  var Dom = dom;
+  var XhrTransportBase = ioXhrTransportBase;
+  var PROXY_PAGE = '/sub_domain_proxy.html';
+  var doc = document;
+  var iframeMap = {};
   function SubDomainTransport(io) {
     var self = this, c = io.config;
     self.io = io;
     c.crossDomain = false;
+    self._onLoad = util.bind(onLoad, self);
   }
   util.augment(SubDomainTransport, XhrTransportBase.proto, {
     send: function () {
@@ -879,499 +1432,16 @@ ioSubDomainTransport = function (exports) {
       } else {
         iframe = iframeDesc.iframe;
       }
-      DomEvent.on(iframe, 'load', _onLoad, self);
+      ioUtil.addEvent(iframe, 'load', self._onLoad);
     }
   });
-  function _onLoad() {
+  function onLoad() {
     var self = this, c = self.io.config, uri = c.uri, hostname = uri.hostname, iframeDesc = iframeMap[hostname];
     iframeDesc.ready = 1;
-    DomEvent.detach(iframeDesc.iframe, 'load', _onLoad, self);
+    ioUtil.removeEvent(iframeDesc.iframe, 'load', self._onLoad);
     self.send();
   }
   exports = SubDomainTransport;
-  return exports;
-}();
-ioScriptTransport = function (exports) {
-  var util = _util_;
-  var IO = ioBase;
-  var OK_CODE = 200, ERROR_CODE = 500;
-  IO.setupConfig({
-    accepts: { script: 'text/javascript, ' + 'application/javascript, ' + 'application/ecmascript, ' + 'application/x-ecmascript' },
-    contents: { script: /javascript|ecmascript/ },
-    converters: {
-      text: {
-        script: function (text) {
-          util.globalEval(text);
-          return text;
-        }
-      }
-    }
-  });
-  function ScriptTransport(io) {
-    var config = io.config, self = this;
-    if (!config.crossDomain) {
-      return new (IO.getTransport('*'))(io);
-    }
-    self.io = io;
-    return self;
-  }
-  util.augment(ScriptTransport, {
-    send: function () {
-      var self = this, io = self.io, c = io.config;
-      self.script = require.load(io._getUrlForSend(), {
-        charset: c.scriptCharset,
-        success: function () {
-          self._callback('success');
-        },
-        error: function () {
-          self._callback('error');
-        }
-      });
-    },
-    _callback: function (event, abort) {
-      var self = this, script = self.script, io = self.io;
-      if (!script) {
-        return;
-      }
-      self.script = undefined;
-      if (abort) {
-        return;
-      }
-      if (event !== 'error') {
-        io._ioReady(OK_CODE, 'success');
-      } else if (event === 'error') {
-        io._ioReady(ERROR_CODE, 'script error');
-      }
-    },
-    abort: function () {
-      this._callback(0, 1);
-    }
-  });
-  IO.setupTransport('script', ScriptTransport);
-  return exports;
-}();
-ioJsonp = function (exports) {
-  var util = _util_;
-  var IO = ioBase;
-  var win = window;
-  IO.setupConfig({
-    jsonp: 'callback',
-    jsonpCallback: function () {
-      return util.guid('jsonp');
-    }
-  });
-  IO.on('start', function (e) {
-    var io = e.io, c = io.config, dataType = c.dataType;
-    if (dataType[0] === 'jsonp') {
-      delete c.contentType;
-      var response, cJsonpCallback = c.jsonpCallback, converters, jsonpCallback = typeof cJsonpCallback === 'function' ? cJsonpCallback() : cJsonpCallback, previous = win[jsonpCallback];
-      c.uri.query[c.jsonp] = jsonpCallback;
-      win[jsonpCallback] = function (r) {
-        if (arguments.length > 1) {
-          r = util.makeArray(arguments);
-        }
-        response = [r];
-      };
-      io.fin(function () {
-        win[jsonpCallback] = previous;
-        if (previous === undefined) {
-          try {
-            delete win[jsonpCallback];
-          } catch (e) {
-          }
-        } else if (response) {
-          previous(response[0]);
-        }
-      });
-      converters = c.converters;
-      converters.script = converters.script || {};
-      converters.script.json = function () {
-        if (!response) {
-          throw new Error('not call jsonpCallback: ' + jsonpCallback);
-        }
-        return response[0];
-      };
-      dataType.length = 2;
-      dataType[0] = 'script';
-      dataType[1] = 'json';
-    }
-  });
-  return exports;
-}();
-ioForm = function (exports) {
-  var util = _util_;
-  var IO = ioBase;
-  var Dom = dom;
-  var querystring = _querystring_;
-  var FormSerializer = ioFormSerializer;
-  var win = window, slice = Array.prototype.slice, FormData = win.FormData;
-  IO.on('start', function (e) {
-    var io = e.io, form, d, dataType, formParam, data, c = io.config, tmpForm = c.form;
-    if (tmpForm) {
-      form = Dom.get(tmpForm);
-      data = c.data;
-      var isUpload = false;
-      var files = {};
-      var inputs = Dom.query('input', form);
-      for (var i = 0, l = inputs.length; i < l; i++) {
-        var input = inputs[i];
-        if (input.type.toLowerCase() === 'file') {
-          isUpload = true;
-          if (!FormData) {
-            break;
-          }
-          var selected = slice.call(input.files, 0);
-          files[Dom.attr(input, 'name')] = selected.length > 1 ? selected : selected[0] || null;
-        }
-      }
-      if (isUpload && FormData) {
-        c.files = c.files || {};
-        util.mix(c.files, files);
-        delete c.contentType;
-      }
-      if (!isUpload || FormData) {
-        formParam = FormSerializer.getFormData(form);
-        if (c.hasContent) {
-          formParam = querystring.stringify(formParam, undefined, undefined, c.serializeArray);
-          if (data) {
-            c.data += '&' + formParam;
-          } else {
-            c.data = formParam;
-          }
-        } else {
-          util.mix(c.uri.query, formParam);
-        }
-      } else {
-        dataType = c.dataType;
-        d = dataType[0];
-        if (d === '*') {
-          d = 'text';
-        }
-        dataType.length = 2;
-        dataType[0] = 'iframe';
-        dataType[1] = d;
-      }
-    }
-  });
-  return exports;
-}();
-ioIframeTransport = function (exports) {
-  var util = _util_, querystring = _querystring_, Dom = dom, IO = ioBase;
-  var DomEvent = eventDom;
-  var UA = ua;
-  var doc = document, OK_CODE = 200, ERROR_CODE = 500, BREATH_INTERVAL = 30, iframeConverter = util.clone(IO.getConfig().converters.text);
-  iframeConverter.json = function (str) {
-    return util.parseJson(util.unEscapeHtml(str));
-  };
-  IO.setupConfig({
-    converters: {
-      iframe: iframeConverter,
-      text: {
-        iframe: function (text) {
-          return text;
-        }
-      },
-      xml: {
-        iframe: function (xml) {
-          return xml;
-        }
-      }
-    }
-  });
-  function createIframe(xhr) {
-    var id = util.guid('io-iframe'), iframe, src = Dom.getEmptyIframeSrc();
-    iframe = xhr.iframe = Dom.create('<iframe ' + (src ? ' src="' + src + '" ' : '') + ' id="' + id + '"' + ' name="' + id + '"' + ' style="position:absolute;left:-9999px;top:-9999px;"/>');
-    Dom.prepend(iframe, doc.body || doc.documentElement);
-    return iframe;
-  }
-  function addDataToForm(query, form, serializeArray) {
-    var ret = [], isArray, i, e;
-    util.each(query, function (data, k) {
-      isArray = util.isArray(data);
-      if (!isArray) {
-        data = [data];
-      }
-      for (i = 0; i < data.length; i++) {
-        e = doc.createElement('input');
-        e.type = 'hidden';
-        e.name = k + (isArray && serializeArray ? '[]' : '');
-        e.value = data[i];
-        Dom.append(e, form);
-        ret.push(e);
-      }
-    });
-    return ret;
-  }
-  function removeFieldsFromData(fields) {
-    Dom.remove(fields);
-  }
-  function IframeTransport(io) {
-    this.io = io;
-  }
-  util.augment(IframeTransport, {
-    send: function () {
-      var self = this, io = self.io, c = io.config, fields, iframe, query, data = c.data, form = Dom.get(c.form);
-      self.attrs = {
-        target: Dom.attr(form, 'target') || '',
-        action: Dom.attr(form, 'action') || '',
-        encoding: Dom.attr(form, 'encoding'),
-        enctype: Dom.attr(form, 'enctype'),
-        method: Dom.attr(form, 'method')
-      };
-      self.form = form;
-      iframe = createIframe(io);
-      Dom.attr(form, {
-        target: iframe.id,
-        action: io._getUrlForSend(),
-        method: 'post',
-        enctype: 'multipart/form-data',
-        encoding: 'multipart/form-data'
-      });
-      if (data) {
-        query = querystring.parse(data);
-      }
-      if (query) {
-        fields = addDataToForm(query, form, c.serializeArray);
-      }
-      self.fields = fields;
-      function go() {
-        DomEvent.on(iframe, 'load error', self._callback, self);
-        form.submit();
-      }
-      if (UA.ie === 6) {
-        setTimeout(go, 0);
-      } else {
-        go();
-      }
-    },
-    _callback: function (event) {
-      var self = this, form = self.form, io = self.io, eventType = event.type, iframeDoc, iframe = io.iframe;
-      if (!iframe) {
-        return;
-      }
-      if (eventType === 'abort' && UA.ie === 6) {
-        setTimeout(function () {
-          Dom.attr(form, self.attrs);
-        }, 0);
-      } else {
-        Dom.attr(form, self.attrs);
-      }
-      removeFieldsFromData(this.fields);
-      DomEvent.detach(iframe);
-      setTimeout(function () {
-        Dom.remove(iframe);
-      }, BREATH_INTERVAL);
-      io.iframe = null;
-      if (eventType === 'load') {
-        try {
-          iframeDoc = iframe.contentWindow.document;
-          if (iframeDoc && iframeDoc.body) {
-            io.responseText = Dom.html(iframeDoc.body);
-            if (util.startsWith(io.responseText, '<?xml')) {
-              io.responseText = undefined;
-            }
-          }
-          if (iframeDoc && iframeDoc.XMLDocument) {
-            io.responseXML = iframeDoc.XMLDocument;
-          } else {
-            io.responseXML = iframeDoc;
-          }
-          if (iframeDoc) {
-            io._ioReady(OK_CODE, 'success');
-          } else {
-            io._ioReady(ERROR_CODE, 'parser error');
-          }
-        } catch (e) {
-          io._ioReady(ERROR_CODE, 'parser error');
-        }
-      } else if (eventType === 'error') {
-        io._ioReady(ERROR_CODE, 'error');
-      }
-    },
-    abort: function () {
-      this._callback({ type: 'abort' });
-    }
-  });
-  IO.setupTransport('iframe', IframeTransport);
-  return exports;
-}();
-ioMethods = function (exports) {
-  var util = _util_;
-  var XPromise = promise, IO = ioBase;
-  var url = _url_;
-  var OK_CODE = 200, MULTIPLE_CHOICES = 300, NOT_MODIFIED = 304, HEADER_REG = /^(.*?):[ \t]*([^\r\n]*)\r?$/gm;
-  function handleResponseData(io) {
-    var text = io.responseText, xml = io.responseXML, c = io.config, converts = c.converters, type, contentType, responseData, contents = c.contents, dataType = c.dataType;
-    if (text || xml) {
-      contentType = io.mimeType || io.getResponseHeader('Content-Type');
-      while (dataType[0] === '*') {
-        dataType.shift();
-      }
-      if (!dataType.length) {
-        for (type in contents) {
-          if (contents[type].test(contentType)) {
-            if (dataType[0] !== type) {
-              dataType.unshift(type);
-            }
-            break;
-          }
-        }
-      }
-      dataType[0] = dataType[0] || 'text';
-      for (var dataTypeIndex = 0; dataTypeIndex < dataType.length; dataTypeIndex++) {
-        if (dataType[dataTypeIndex] === 'text' && text !== undefined) {
-          responseData = text;
-          break;
-        } else if (dataType[dataTypeIndex] === 'xml' && xml !== undefined) {
-          responseData = xml;
-          break;
-        }
-      }
-      if (!responseData) {
-        var rawData = {
-          text: text,
-          xml: xml
-        };
-        util.each([
-          'text',
-          'xml'
-        ], function (prevType) {
-          var type = dataType[0], converter = converts[prevType] && converts[prevType][type];
-          if (converter && rawData[prevType]) {
-            dataType.unshift(prevType);
-            responseData = prevType === 'text' ? text : xml;
-            return false;
-          }
-          return undefined;
-        });
-      }
-    }
-    var prevType = dataType[0];
-    for (var i = 1; i < dataType.length; i++) {
-      type = dataType[i];
-      var converter = converts[prevType] && converts[prevType][type];
-      if (!converter) {
-        throw new Error('no covert for ' + prevType + ' => ' + type);
-      }
-      responseData = converter(responseData);
-      prevType = type;
-    }
-    io.responseData = responseData;
-  }
-  util.extend(IO, XPromise, {
-    setRequestHeader: function (name, value) {
-      var self = this;
-      self.requestHeaders[name] = value;
-      return self;
-    },
-    getAllResponseHeaders: function () {
-      var self = this;
-      return self.state === 2 ? self.responseHeadersString : null;
-    },
-    getResponseHeader: function (name) {
-      var match, responseHeaders, self = this;
-      name = name.toLowerCase();
-      if (self.state === 2) {
-        if (!(responseHeaders = self.responseHeaders)) {
-          responseHeaders = self.responseHeaders = {};
-          while (match = HEADER_REG.exec(self.responseHeadersString)) {
-            responseHeaders[match[1].toLowerCase()] = match[2];
-          }
-        }
-        match = responseHeaders[name];
-      }
-      return match === undefined ? null : match;
-    },
-    overrideMimeType: function (type) {
-      var self = this;
-      if (!self.state) {
-        self.mimeType = type;
-      }
-      return self;
-    },
-    abort: function (statusText) {
-      var self = this;
-      statusText = statusText || 'abort';
-      if (self.transport) {
-        self.transport.abort(statusText);
-      }
-      self._ioReady(0, statusText);
-      return self;
-    },
-    getNativeXhr: function () {
-      var transport = this.transport;
-      if (transport) {
-        return transport.nativeXhr;
-      }
-      return null;
-    },
-    _ioReady: function (status, statusText) {
-      var self = this;
-      if (self.state === 2) {
-        return;
-      }
-      self.state = 2;
-      self.readyState = 4;
-      var isSuccess;
-      if (status >= OK_CODE && status < MULTIPLE_CHOICES || status === NOT_MODIFIED) {
-        if (status === NOT_MODIFIED) {
-          statusText = 'not modified';
-          isSuccess = true;
-        } else {
-          try {
-            handleResponseData(self);
-            statusText = 'success';
-            isSuccess = true;
-          } catch (e) {
-            if ('@DEBUG@') {
-              console.error(e.stack || e);
-              setTimeout(function () {
-                throw e;
-              }, 0);
-            }
-            statusText = e.message || 'parser error';
-          }
-        }
-      } else {
-        if (status < 0) {
-          status = 0;
-        }
-      }
-      self.status = status;
-      self.statusText = statusText;
-      var defer = self.defer, config = self.config, timeoutTimer;
-      if (timeoutTimer = self.timeoutTimer) {
-        clearTimeout(timeoutTimer);
-        self.timeoutTimer = 0;
-      }
-      var handler = isSuccess ? 'success' : 'error', h, v = [
-          self.responseData,
-          statusText,
-          self
-        ], context = config.context, eventObject = {
-          ajaxConfig: config,
-          io: self
-        };
-      if (h = config[handler]) {
-        h.apply(context, v);
-      }
-      if (h = config.complete) {
-        h.apply(context, v);
-      }
-      IO.fire(handler, eventObject);
-      IO.fire('complete', eventObject);
-      defer[isSuccess ? 'resolve' : 'reject'](v);
-    },
-    _getUrlForSend: function () {
-      var c = this.config, uri = c.uri;
-      var search = uri.search || '';
-      delete uri.search;
-      if (search && !util.isEmptyObject(uri.query)) {
-        search = '&' + search.substring(1);
-      }
-      return url.stringify(uri, c.serializeArray) + search;
-    }
-  });
   return exports;
 }();
 ioXhrTransport = function (exports) {
@@ -1424,7 +1494,7 @@ _io_ = function (exports) {
     });
   }
   util.mix(IO, {
-    version: '1.0.1',
+    version: '1.1.0',
     _swf: require.toUrl('./io.swf'),
     serialize: serializer.serialize,
     getFormData: serializer.getFormData,
